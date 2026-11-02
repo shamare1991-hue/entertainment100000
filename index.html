@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta name="theme-color" content="#101a2b">
+  <title>خرائط شمر | SHAMMAR MAPS</title>
+  <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:#0b1220;color:#fff}
+    #map{position:absolute;inset:0}.top{position:absolute;z-index:2;top:12px;right:12px;left:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:none}
+    .brand,.panel,.tool{background:#101a2bee;border:1px solid #ffffff24;box-shadow:0 8px 24px #0005;backdrop-filter:blur(10px);border-radius:14px}
+    .brand{padding:9px 13px;font-weight:800;white-space:nowrap}.brand small{display:block;color:#9fb3ce;font-size:10px;font-weight:500}
+    .search{display:flex;gap:6px;flex:1;min-width:180px;pointer-events:auto}
+    .search input,.coords input{min-width:0;width:100%;background:#0b1424;color:#fff;border:1px solid #ffffff30;border-radius:10px;padding:11px;font:inherit;outline:none}
+    button{font:inherit;color:#fff;background:#1e6bd6;border:0;border-radius:10px;padding:10px 13px;cursor:pointer;white-space:nowrap}
+    .tool{pointer-events:auto;padding:10px 12px}.tools{position:absolute;z-index:2;right:12px;bottom:20px;display:grid;gap:8px}
+    .panel{position:absolute;z-index:2;left:12px;bottom:20px;width:min(310px,calc(100% - 24px));padding:12px}
+    .panel h3{margin:0 0 8px;font-size:14px}.coords{display:grid;grid-template-columns:1fr 1fr;gap:7px}.coords input{font-size:13px}
+    .panel p{font-size:11px;line-height:1.7;color:#b9c8dc;margin:8px 0 0}
+    @media(max-width:480px){.brand{font-size:13px}.brand small{font-size:9px}.search{order:3;flex-basis:100%}.top{top:8px;right:8px;left:8px}.panel{bottom:12px;left:8px;width:calc(100% - 70px)}.tools{right:8px;bottom:12px}}
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<header class="top">
+  <div class="brand">خرائط شمر <small>SHAMMAR MAPS · النسخة التجريبية</small></div>
+  <form class="search" id="searchForm"><input id="place" placeholder="ابحث عن مدينة أو مكان..." aria-label="ابحث عن مكان"><button>بحث</button></form>
+  <button class="tool" id="globeBtn">🌐 الكرة الأرضية</button>
+</header>
+<div class="tools">
+  <button class="tool" id="locateBtn">📍 موقعي</button>
+  <button class="tool" id="tiltBtn">🛰️ عرض مائل</button>
+  <button class="tool" id="resetBtn">⌖ إعادة ضبط</button>
+</div>
+<section class="panel">
+  <h3>الانتقال إلى الإحداثيات</h3>
+  <div class="coords"><input id="lat" inputmode="decimal" placeholder="خط العرض"><input id="lon" inputmode="decimal" placeholder="خط الطول"></div>
+  <button id="goBtn" style="width:100%;margin-top:7px">انتقال إلى الموقع</button>
+  <p>الصور الفضائية مقدمة من Esri عبر الإنترنت. يلزم اتصال بالإنترنت، وقد تختلف دقة الصور وتاريخها حسب المنطقة. تحديد الموقع اختياري ويتطلب موافقة المتصفح.</p>
+</section>
+<script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
+<script>
+const style={version:8,sources:{satellite:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,attribution:'Tiles © Esri'}},layers:[{id:'satellite',type:'raster',source:'satellite'}]};
+const map=new maplibregl.Map({container:'map',style,center:[37.6173,36.2021],zoom:5,projection:'globe',pitch:0,canvasContextAttributes:{antialias:true}});
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-right');
+map.addControl(new maplibregl.ScaleControl({unit:'metric'}),'bottom-right');
+let marker=null;
+function go(lon,lat,z=13){
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat < -90||lat>90||lon < -180||lon>180){alert('تحقق من الإحداثيات');return}
+  map.flyTo({center:[lon,lat],zoom:z,pitch:45,speed:1.2});
+  if(marker)marker.remove();
+  marker=new maplibregl.Marker({color:'#ffb020'}).setLngLat([lon,lat]).addTo(map);
+  document.getElementById('lat').value=lat.toFixed(6);
+  document.getElementById('lon').value=lon.toFixed(6);
+}
+document.getElementById('goBtn').onclick=()=>go(Number(document.getElementById('lon').value),Number(document.getElementById('lat').value));
+document.getElementById('locateBtn').onclick=()=>{
+  if(!navigator.geolocation){alert('المتصفح لا يدعم تحديد الموقع');return}
+  navigator.geolocation.getCurrentPosition(p=>go(p.coords.longitude,p.coords.latitude,15),
+  ()=>alert('تعذر تحديد الموقع. اسمح للموقع من إعدادات المتصفح وتأكد من استخدام HTTPS.'),
+  {enableHighAccuracy:true,timeout:12000});
+};
+document.getElementById('tiltBtn').onclick=()=>map.easeTo({pitch:map.getPitch()>10?0:60,bearing:map.getBearing()+15,duration:900});
+document.getElementById('globeBtn').onclick=()=>map.easeTo({center:[0,20],zoom:1.6,pitch:0,bearing:0,duration:1200});
+document.getElementById('resetBtn').onclick=()=>map.flyTo({center:[37.6173,36.2021],zoom:5,pitch:0,bearing:0});
+document.getElementById('searchForm').addEventListener('submit',async e=>{
+  e.preventDefault();const q=document.getElementById('place').value.trim();if(!q)return;
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
+    const a=await r.json();if(!a.length){alert('لم يتم العثور على المكان');return}
+    go(Number(a[0].lon),Number(a[0].lat),13);
+  }catch(err){alert('تعذر البحث. تحقق من الإنترنت وحاول مجدداً')}
+});
+</script>
+</body>
+</html>
